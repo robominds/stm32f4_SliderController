@@ -1,1 +1,22 @@
 .DS_Store
+
+# Build output
+build/
+
+# IDE files
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+
+# Dependency files
+*.d
+
+# Generated files
+*.o
+*.elf
+*.bin
+*.hex
+*.map
+*.lst
