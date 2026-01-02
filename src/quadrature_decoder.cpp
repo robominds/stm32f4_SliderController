@@ -5,36 +5,7 @@
 
 #include "quadrature_decoder.h"
 #include "stm32f407xx.h"
-
-/* Timer register offsets */
-#define TIM_CR1_OFFSET      0x00
-#define TIM_SMCR_OFFSET     0x08
-#define TIM_CCMR1_OFFSET    0x18
-#define TIM_CCER_OFFSET     0x20
-#define TIM_CNT_OFFSET      0x24
-#define TIM_PSC_OFFSET      0x28
-#define TIM_ARR_OFFSET      0x2C
-
-/* Timer register access macros */
-#define TIM_CR1(base)       (*(volatile uint32_t *)((base) + TIM_CR1_OFFSET))
-#define TIM_SMCR(base)      (*(volatile uint32_t *)((base) + TIM_SMCR_OFFSET))
-#define TIM_CCMR1(base)     (*(volatile uint32_t *)((base) + TIM_CCMR1_OFFSET))
-#define TIM_CCER(base)      (*(volatile uint32_t *)((base) + TIM_CCER_OFFSET))
-#define TIM_CNT(base)       (*(volatile uint32_t *)((base) + TIM_CNT_OFFSET))
-#define TIM_PSC(base)       (*(volatile uint32_t *)((base) + TIM_PSC_OFFSET))
-#define TIM_ARR(base)       (*(volatile uint32_t *)((base) + TIM_ARR_OFFSET))
-
-/* Timer base addresses */
-#define TIM2_BASE           0x40000000UL
-#define TIM3_BASE           0x40000400UL
-#define TIM4_BASE           0x40000800UL
-#define TIM5_BASE           0x40000C00UL
-
-/* RCC APB1 Timer Enable bits */
-#define RCC_APB1ENR_TIM2EN  (1U << 0)
-#define RCC_APB1ENR_TIM3EN  (1U << 1)
-#define RCC_APB1ENR_TIM4EN  (1U << 2)
-#define RCC_APB1ENR_TIM5EN  (1U << 3)
+#include "timer_common.h"
 
 /* Timer Control Register 1 (CR1) bits */
 #define TIM_CR1_CEN         (1U << 0)   /* Counter enable */
@@ -68,7 +39,7 @@ static void EnableTimerClock(uint32_t timer_base) {
 /**
  * @brief Configure GPIO pins for encoder inputs
  */
-static void ConfigureGPIO(GPIO_TypeDef *gpio, uint8_t pin_a, uint8_t pin_b, uint8_t af_number) {
+static void ConfigureEncoderGPIO(GPIO_TypeDef *gpio, uint8_t pin_a, uint8_t pin_b, uint8_t af_number) {
     /* Set pins to alternate function mode */
     gpio->MODER &= ~(0x3U << (pin_a * 2));
     gpio->MODER |= (0x2U << (pin_a * 2));
@@ -130,7 +101,10 @@ bool QuadEncoder_Init(QuadEncoder_Handle *handle, const QuadEncoder_Config *conf
     RCC->AHB1ENR |= (1U << gpio_offset);
     
     /* Configure GPIO pins */
-    ConfigureGPIO((GPIO_TypeDef *)config->gpio_base, config->pin_a, config->pin_b, config->af_number);
+    ConfigureEncoderGPIO(reinterpret_cast<GPIO_TypeDef *>(static_cast<uintptr_t>(config->gpio_base)),
+                         config->pin_a,
+                         config->pin_b,
+                         config->af_number);
     
     /* Configure timer for encoder mode */
     /* Disable timer */
