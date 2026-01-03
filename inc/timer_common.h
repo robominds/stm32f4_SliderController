@@ -6,10 +6,10 @@
 #ifndef TIMER_COMMON_H
 #define TIMER_COMMON_H
 
-#include <cstdint>
+#include <stdint.h>
 
 /* Register access helper */
-#define REG32(base, offset) (*reinterpret_cast<volatile uint32_t *>(static_cast<uintptr_t>((base) + (offset))))
+#define REG32(base, offset) (*((volatile uint32_t *)((uintptr_t)((base) + (offset)))))
 
 /* Timer register offsets */
 #define TIM_CR1_OFFSET      0x00
