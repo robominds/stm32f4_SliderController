@@ -26,7 +26,9 @@ src/system_stm32f4xx.c
 
 # C++ sources
 CXX_SOURCES = \
-src/main.cpp
+src/main.cpp \
+src/pwm_driver.cpp \
+src/quadrature_decoder.cpp
 
 # ASM sources
 ASM_SOURCES =  \
