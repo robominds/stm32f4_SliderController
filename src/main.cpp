@@ -4,10 +4,10 @@
   *          Blinks LED on PA6 and PA7 using FreeRTOS tasks
   */
 
+
 #include <stdint.h>
-#include "stm32f407xx.h"
 #include "system_stm32f4xx.h"
-#include "FreeRTOS.h"
+#include "FreeRTOS.h" // IWYU pragma: keep - Must include FreeRTOS.h before task.h
 #include "task.h"
 #include "led.h"
 
