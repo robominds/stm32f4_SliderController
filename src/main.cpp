@@ -10,10 +10,18 @@
 #include "FreeRTOS.h" // IWYU pragma: keep - Must include FreeRTOS.h before task.h
 #include "task.h"
 #include "led.h"
+#include "uart_driver.h"
 
 int main(void) {
     /* Initialize system */
     SystemInit();
+    
+    /* Initialize interrupt-driven UART at 115200 baud */
+    UART_Init(115200);
+    
+    /* Send startup message */
+    UART_WriteString("STM32F407 Interrupt-Driven UART Initialized\r\n");
+    UART_WriteString("System Ready\r\n");
     
     /* Initialize GPIO for LED */
     LED_Init();

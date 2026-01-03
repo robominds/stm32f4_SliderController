@@ -37,7 +37,8 @@ CXX_SOURCES = \
 src/main.cpp \
 src/led.cpp \
 src/pwm_driver.cpp \
-src/quadrature_decoder.cpp
+src/quadrature_decoder.cpp \
+src/uart_driver.cpp
 
 # ASM sources
 ASM_SOURCES =  \
