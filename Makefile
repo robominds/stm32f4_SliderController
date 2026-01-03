@@ -61,6 +61,7 @@ TOOLCHAIN_PATH := $(shell command -v $(PREFIX)gcc 2> /dev/null)
 ifndef TOOLCHAIN_PATH
 GCC_PATH = arm-toolchain/bin
 endif
+GCC_PATH = $(dir $(TOOLCHAIN_PATH))
 CC = $(GCC_PATH)/$(PREFIX)gcc
 CXX = $(GCC_PATH)/$(PREFIX)g++
 AS = $(GCC_PATH)/$(PREFIX)gcc -x assembler-with-cpp
