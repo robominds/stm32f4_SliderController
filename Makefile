@@ -35,6 +35,7 @@ FreeRTOS/portable/GCC/ARM_CM4F/port.c
 # C++ sources
 CXX_SOURCES = \
 src/main.cpp \
+src/led.cpp \
 src/pwm_driver.cpp \
 src/quadrature_decoder.cpp
 

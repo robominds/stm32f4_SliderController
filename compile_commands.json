@@ -6,6 +6,11 @@
   },
   {
     "directory": "/Users/markcastelluccio/projects/stm32f4_SliderController",
+    "command": "arm-none-eabi-g++ -mcpu=cortex-m4 -mthumb -mfpu=fpv4-sp-d16 -mfloat-abi=hard -DSTM32F407xx -Isrc -Iinc -IFreeRTOS/include -IFreeRTOS/portable/GCC/ARM_CM4F -Og -Wall -fdata-sections -ffunction-sections -fno-exceptions -fno-rtti -fno-threadsafe-statics -fno-use-cxa-atexit -g -gdwarf-2 -std=c++14 -c src/led.cpp -o build/led.o",
+    "file": "src/led.cpp"
+  },
+  {
+    "directory": "/Users/markcastelluccio/projects/stm32f4_SliderController",
     "command": "arm-none-eabi-g++ -mcpu=cortex-m4 -mthumb -mfpu=fpv4-sp-d16 -mfloat-abi=hard -DSTM32F407xx -Isrc -Iinc -IFreeRTOS/include -IFreeRTOS/portable/GCC/ARM_CM4F -Og -Wall -fdata-sections -ffunction-sections -fno-exceptions -fno-rtti -fno-threadsafe-statics -fno-use-cxa-atexit -g -gdwarf-2 -std=c++14 -c src/pwm_driver.cpp -o build/pwm_driver.o",
     "file": "src/pwm_driver.cpp"
   },
