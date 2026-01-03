@@ -21,3 +21,10 @@ build/
 *.hex
 *.map
 *.lst
+
+# ARM Toolchain
+arm-toolchain/
+arm-toolchain.tar.xz
+
+# FreeRTOS
+FreeRTOS/

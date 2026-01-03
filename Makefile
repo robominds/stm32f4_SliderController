@@ -22,7 +22,15 @@ BUILD_DIR = build
 ######################################
 # C sources
 C_SOURCES =  \
-src/system_stm32f4xx.c
+src/system_stm32f4xx.c \
+FreeRTOS/tasks.c \
+FreeRTOS/queue.c \
+FreeRTOS/list.c \
+FreeRTOS/timers.c \
+FreeRTOS/event_groups.c \
+FreeRTOS/stream_buffer.c \
+FreeRTOS/portable/MemMang/heap_4.c \
+FreeRTOS/portable/GCC/ARM_CM4F/port.c
 
 # C++ sources
 CXX_SOURCES = \
@@ -47,11 +55,16 @@ AS = $(GCC_PATH)/$(PREFIX)gcc -x assembler-with-cpp
 CP = $(GCC_PATH)/$(PREFIX)objcopy
 SZ = $(GCC_PATH)/$(PREFIX)size
 else
-CC = $(PREFIX)gcc
-CXX = $(PREFIX)g++
-AS = $(PREFIX)gcc -x assembler-with-cpp
-CP = $(PREFIX)objcopy
-SZ = $(PREFIX)size
+# Check if toolchain is in PATH, otherwise use local installation
+TOOLCHAIN_PATH := $(shell command -v $(PREFIX)gcc 2> /dev/null)
+ifndef TOOLCHAIN_PATH
+GCC_PATH = arm-toolchain/bin
+endif
+CC = $(GCC_PATH)/$(PREFIX)gcc
+CXX = $(GCC_PATH)/$(PREFIX)g++
+AS = $(GCC_PATH)/$(PREFIX)gcc -x assembler-with-cpp
+CP = $(GCC_PATH)/$(PREFIX)objcopy
+SZ = $(GCC_PATH)/$(PREFIX)size
 endif
 HEX = $(CP) -O ihex
 BIN = $(CP) -O binary -S
@@ -85,7 +98,9 @@ AS_INCLUDES =
 # C includes
 C_INCLUDES =  \
 -Isrc \
--Iinc
+-Iinc \
+-IFreeRTOS/include \
+-IFreeRTOS/portable/GCC/ARM_CM4F
 
 # compile gcc flags
 ASFLAGS = $(MCU) $(AS_DEFS) $(AS_INCLUDES) $(OPT) -Wall -fdata-sections -ffunction-sections
