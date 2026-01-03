@@ -1,0 +1,22 @@
+[
+  {
+    "directory": "/Users/markcastelluccio/projects/stm32f4_SliderController",
+    "command": "arm-none-eabi-g++ -mcpu=cortex-m4 -mthumb -mfpu=fpv4-sp-d16 -mfloat-abi=hard -DSTM32F407xx -Isrc -Iinc -Og -Wall -fdata-sections -ffunction-sections -fno-exceptions -fno-rtti -fno-threadsafe-statics -fno-use-cxa-atexit -g -gdwarf-2 -std=c++14 -c src/main.cpp -o build/main.o",
+    "file": "src/main.cpp"
+  },
+  {
+    "directory": "/Users/markcastelluccio/projects/stm32f4_SliderController",
+    "command": "arm-none-eabi-g++ -mcpu=cortex-m4 -mthumb -mfpu=fpv4-sp-d16 -mfloat-abi=hard -DSTM32F407xx -Isrc -Iinc -Og -Wall -fdata-sections -ffunction-sections -fno-exceptions -fno-rtti -fno-threadsafe-statics -fno-use-cxa-atexit -g -gdwarf-2 -std=c++14 -c src/pwm_driver.cpp -o build/pwm_driver.o",
+    "file": "src/pwm_driver.cpp"
+  },
+  {
+    "directory": "/Users/markcastelluccio/projects/stm32f4_SliderController",
+    "command": "arm-none-eabi-g++ -mcpu=cortex-m4 -mthumb -mfpu=fpv4-sp-d16 -mfloat-abi=hard -DSTM32F407xx -Isrc -Iinc -Og -Wall -fdata-sections -ffunction-sections -fno-exceptions -fno-rtti -fno-threadsafe-statics -fno-use-cxa-atexit -g -gdwarf-2 -std=c++14 -c src/quadrature_decoder.cpp -o build/quadrature_decoder.o",
+    "file": "src/quadrature_decoder.cpp"
+  },
+  {
+    "directory": "/Users/markcastelluccio/projects/stm32f4_SliderController",
+    "command": "arm-none-eabi-gcc -mcpu=cortex-m4 -mthumb -mfpu=fpv4-sp-d16 -mfloat-abi=hard -DSTM32F407xx -Isrc -Iinc -Og -Wall -fdata-sections -ffunction-sections -g -gdwarf-2 -std=c11 -c src/system_stm32f4xx.c -o build/system_stm32f4xx.o",
+    "file": "src/system_stm32f4xx.c"
+  }
+]
