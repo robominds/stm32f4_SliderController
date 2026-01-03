@@ -212,5 +212,6 @@ float QuadEncoder_GetSpeed(QuadEncoder_Handle *handle, uint32_t time_ms) {
     /* and calculate the difference divided by the time interval */
     
     /* For now, return 0 - this would need proper timing implementation */
-    return 0.0f;
+    // TODO: implement real speed calculation using the provided time_ms interval
+    return current_pos*1.0;
 }
