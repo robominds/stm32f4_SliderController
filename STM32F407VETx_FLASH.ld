@@ -129,7 +129,11 @@ SECTIONS
     . = ALIGN(4);
     _ebss = .;         /* define a global symbol at bss end */
     __bss_end__ = _ebss;
+    . = ALIGN (8);
+    _end = .;
   } >RAM
+
+  PROVIDE(__HEAP_START = _end);
 
   /* User_heap_stack section, used to check that there is enough RAM left */
   ._user_heap_stack :
