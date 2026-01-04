@@ -30,7 +30,8 @@ FreeRTOS/timers.c \
 FreeRTOS/event_groups.c \
 FreeRTOS/stream_buffer.c \
 FreeRTOS/portable/MemMang/heap_4.c \
-FreeRTOS/portable/GCC/ARM_CM4F/port.c
+FreeRTOS/portable/GCC/ARM_CM4F/port.c \
+syscalls.c
 
 # C++ sources
 CXX_SOURCES = \
@@ -94,7 +95,9 @@ AS_DEFS =
 
 # C defines
 C_DEFS =  \
--DSTM32F407xx
+-DSTM32F407xx \
+-D__FPU_PRESENT=1 \
+-D__FPU_USED=1
 
 # AS includes
 AS_INCLUDES = 
