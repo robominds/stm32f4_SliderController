@@ -6,8 +6,8 @@
 #include <stdint.h>
 #include "system_stm32f4xx.h"
 
-/* System Clock Frequency (HSI = 16MHz) */
-uint32_t SystemCoreClock = 16000000;
+/* System Clock Frequency */
+uint32_t SystemCoreClock = 168000000;
 
 /* Constants for clock configuration */
 #define HSI_VALUE    16000000U  /*!< Value of the Internal oscillator in Hz */
@@ -39,27 +39,72 @@ void SystemInit(void)
     SCB_CPACR |= ((3UL << 10*2)|(3UL << 11*2));  /* set CP10 and CP11 Full Access */
   #endif
 
-  /* Reset the RCC clock configuration to the default reset state */
-  /* Set HSION bit */
-  RCC_CR |= 0x00000001U;
-
-  /* Reset CFGR register */
+  /* Reset RCC configuration */
+  RCC_CR |= 0x00000001U;      /* HSION */
   RCC_CFGR = 0x00000000U;
-
-  /* Reset HSEON, CSSON and PLLON bits */
-  RCC_CR &= 0xFEF6FFFFU;
-
-  /* Reset PLLCFGR register */
-  RCC_PLLCFGR = 0x24003010U;
-
-  /* Reset HSEBYP bit */
-  RCC_CR &= 0xFFFBFFFFU;
-
-  /* Disable all interrupts */
+  RCC_CR &= 0xFEF6FFFFU;      /* HSEON, CSSON, PLLON off */
+  RCC_PLLCFGR = 0x24003010U;  /* Reset value */
+  RCC_CR &= 0xFFFBFFFFU;      /* HSEBYP off */
   RCC_CIR = 0x00000000U;
 
-  /* Configure Flash prefetch, Instruction cache, Data cache and wait state */
-  FLASH_ACR = 0x00000000U;
+  /* Enable HSE (8 MHz crystal) */
+  RCC_CR |= (1U << 16); /* HSEON */
+  uint32_t hse_timeout = 0;
+  while ((RCC_CR & (1U << 17)) == 0 && hse_timeout < 100000) {
+    hse_timeout++;
+  }
+  
+  if ((RCC_CR & (1U << 17)) == 0) {
+    /* HSE failed to start - hang here for debugging */
+    while(1);
+  }
+
+  /* Configure bus prescalers EARLY, before PLL, while on HSE */
+  /* PPRE2 = 4 (100b = /2) at bits [15:13]
+     PPRE1 = 5 (101b = /4) at bits [12:10]  
+     HPRE  = 0 (0000b = /1) at bits [7:4] */
+  volatile uint32_t *cfgr_addr = (volatile uint32_t *)(0x40023800UL + 0x08UL);
+  *cfgr_addr = (4U << 13) | (5U << 10) | (0U << 4) | 0x0U;
+  
+  /* Read back to verify write took effect */
+  volatile uint32_t readback1 = *cfgr_addr;
+  (void)readback1;
+
+  /* Configure Flash latency and caches for 168MHz */
+  FLASH_ACR = (1U << 8) | (1U << 9) | (1U << 10) | (5U << 0); /* prefetch, ICACHE, DCACHE, 5 WS */
+
+  /* PLL configuration for 8 MHz HSE:
+   * VCO = 8MHz / 8 * 336 = 336MHz
+   * SYSCLK = VCO / 2 = 168MHz
+   * USB = VCO / 7 = 48MHz
+   */
+  uint32_t pllcfgr = 0;
+  pllcfgr |= (8U & 0x3FU);          /* PLLM = 8 */
+  pllcfgr |= (336U << 6);           /* PLLN = 336 */
+  pllcfgr |= (0U << 16);            /* PLLP = 2 (00b) */
+  pllcfgr |= (7U << 24);            /* PLLQ = 7 */
+  pllcfgr |= (1U << 22);            /* PLL source = HSE */
+  RCC_PLLCFGR = pllcfgr;
+
+  /* Enable PLL */
+  RCC_CR |= (1U << 24);
+  while ((RCC_CR & (1U << 25)) == 0) {
+    /* wait for PLLRDY */
+  }
+
+  /* Switch to PLL as system clock (SW=2), reapply prescalers explicitly */
+  RCC_CFGR = (4U << 13) | (5U << 10) | (0U << 4) | 0x2U;
+  
+  while (((RCC_CFGR >> 2) & 0x3U) != 0x2U) {
+    /* wait for PLL as system clock */
+  }
+
+  /* Verify prescalers were applied by reading back */
+  volatile uint32_t cfgr_verify = RCC_CFGR;
+  (void)cfgr_verify;
+
+  /* Update global clock */
+  SystemCoreClock = 168000000U;
 }
 
 /**

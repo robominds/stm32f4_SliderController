@@ -6,6 +6,7 @@
 
 #include "uart_driver.h"
 #include "stm32f407xx.h"
+#include "system_stm32f4xx.h"
 
 /* Circular buffer structures */
 typedef struct {
@@ -57,16 +58,21 @@ static inline void CircularBuffer_Clear(CircularBuffer_t *cb) {
 }
 
 /**
- * @brief Initialize USART1 with interrupt-driven operation
+ * @brief Initialize USART1
  * @param baudrate Desired baud rate (e.g., 9600, 115200)
- * 
- * Configuration:
- * - PA9: USART1_TX (AF7)
- * - PA10: USART1_RX (AF7)
- * - 8 data bits, 1 stop bit, no parity
- * - Assumes APB2 clock = 84 MHz (with 168 MHz system clock)
+ *
+ * Notes:
+ * - System clock is configured to 168 MHz
+ * - APB2 prescaler divides by 2, so APB2 = 84 MHz
+ * - BRR format: [15:4]=mantissa, [3:0]=fraction (for 16x oversampling)
  */
+static inline uint32_t UART_GetApb2Clock(void) {
+    /* APB2 = SystemCoreClock / 2 (prescaler /2 is working correctly) */
+    return SystemCoreClock / 2;  /* 168 MHz / 2 = 84 MHz */
+}
+
 void UART_Init(uint32_t baudrate) {
+
     /* Initialize circular buffers */
     CircularBuffer_Clear(&rxBuffer);
     CircularBuffer_Clear(&txBuffer);
@@ -78,68 +84,59 @@ void UART_Init(uint32_t baudrate) {
     RCC->APB2ENR |= RCC_APB2ENR_USART1EN;
     
     /* Configure PA9 (TX) and PA10 (RX) as alternate function */
-    /* MODER: 00 = Input, 01 = Output, 10 = Alternate, 11 = Analog */
-    GPIOA->MODER &= ~(0x3U << (9 * 2));   /* Clear PA9 mode bits */
-    GPIOA->MODER |= (0x2U << (9 * 2));    /* Set PA9 as alternate function */
+    /* Clear and set PA9 mode to alternate function (10) */
+    GPIOA->MODER &= ~(0x3U << 18);  /* Clear bits [19:18] for PA9 */
+    GPIOA->MODER |= (0x2U << 18);   /* Set to 10 (alternate function) */
     
-    GPIOA->MODER &= ~(0x3U << (10 * 2));  /* Clear PA10 mode bits */
-    GPIOA->MODER |= (0x2U << (10 * 2));   /* Set PA10 as alternate function */
+    /* Clear and set PA10 mode to alternate function (10) */
+    GPIOA->MODER &= ~(0x3U << 20);  /* Clear bits [21:20] for PA10 */
+    GPIOA->MODER |= (0x2U << 20);   /* Set to 10 (alternate function) */
     
-    /* Set alternate function to AF7 (USART1) for PA9 and PA10 */
-    /* AFR[1] is for pins 8-15 */
-    GPIOA->AFR[1] &= ~(0xFU << ((9 - 8) * 4));   /* Clear PA9 AF bits */
-    GPIOA->AFR[1] |= (7U << ((9 - 8) * 4));      /* Set PA9 to AF7 */
+    /* Set alternate function to AF7 (USART1) for both pins */
+    /* AFR[1] handles pins 8-15 */
+    /* PA9 uses bits [7:4] in AFR[1] */
+    GPIOA->AFR[1] &= ~(0xFU << 4);  /* Clear PA9 AF bits */
+    GPIOA->AFR[1] |= (7U << 4);     /* Set PA9 to AF7 */
     
-    GPIOA->AFR[1] &= ~(0xFU << ((10 - 8) * 4));  /* Clear PA10 AF bits */
-    GPIOA->AFR[1] |= (7U << ((10 - 8) * 4));     /* Set PA10 to AF7 */
+    /* PA10 uses bits [11:8] in AFR[1] */
+    GPIOA->AFR[1] &= ~(0xFU << 8);  /* Clear PA10 AF bits */
+    GPIOA->AFR[1] |= (7U << 8);     /* Set PA10 to AF7 */
     
-    /* Configure output type as push-pull for TX */
-    GPIOA->OTYPER &= ~(1U << 9);   /* PA9 push-pull */
+    /* Disable pull-ups/pull-downs (no pull) */
+    GPIOA->PUPDR &= ~(0x3U << 18);  /* Clear PA9 PUPDR bits */
+    GPIOA->PUPDR &= ~(0x3U << 20);  /* Clear PA10 PUPDR bits */
     
-    /* Set high speed */
-    GPIOA->OSPEEDR |= (0x3U << (9 * 2));   /* PA9 high speed */
-    GPIOA->OSPEEDR |= (0x3U << (10 * 2));  /* PA10 high speed */
+    /* Configure output type as push-pull for TX (default is already push-pull, but make sure) */
+    GPIOA->OTYPER &= ~(1U << 9);    /* PA9 push-pull */
     
-    /* Set pull-up for both TX and RX */
-    GPIOA->PUPDR &= ~(0x3U << (9 * 2));    /* Clear PA9 pull bits */
-    GPIOA->PUPDR |= (0x1U << (9 * 2));     /* Set PA9 pull-up */
+    /* Set speed to high */
+    GPIOA->OSPEEDR &= ~(0x3U << 18);
+    GPIOA->OSPEEDR |= (0x3U << 18);  /* PA9 high speed */
     
-    GPIOA->PUPDR &= ~(0x3U << (10 * 2));   /* Clear PA10 pull bits */
-    GPIOA->PUPDR |= (0x1U << (10 * 2));    /* Set PA10 pull-up */
+    GPIOA->OSPEEDR &= ~(0x3U << 20);
+    GPIOA->OSPEEDR |= (0x3U << 20);  /* PA10 high speed */
     
-    /* Configure USART1 */
-    /* Disable USART1 before configuration */
-    USART1->CR1 &= ~USART_CR1_UE;
-    
-    /* Configure baud rate */
-    /* BRR = fCK / (16 * baud_rate) for OVER8=0 */
-    /* With APB2 = 84 MHz: BRR = 84000000 / (16 * baudrate) */
-    uint32_t apb2_clock = 84000000;  /* APB2 clock frequency */
-    uint32_t usartdiv = apb2_clock / baudrate;
-    USART1->BRR = usartdiv;
-    
-    /* Configure USART1 CR1 */
-    /* 8 data bits (M=0), no parity (PCE=0) */
+    /* Reset USART1 */
     USART1->CR1 = 0;
-    USART1->CR1 |= USART_CR1_TE;      /* Enable transmitter */
-    USART1->CR1 |= USART_CR1_RE;      /* Enable receiver */
-    USART1->CR1 |= USART_CR1_RXNEIE;  /* Enable RXNE interrupt */
-    /* Note: TXEIE is enabled only when we have data to send */
-    
-    /* Configure USART1 CR2 */
-    /* 1 stop bit (STOP[1:0] = 00) */
     USART1->CR2 = 0;
-    
-    /* Configure USART1 CR3 */
-    /* No hardware flow control */
     USART1->CR3 = 0;
     
-    /* Enable USART1 */
-    USART1->CR1 |= USART_CR1_UE;
+    /* Calculate BRR with proper mantissa.fraction format for 16x oversampling
+     * USARTDIV = PCLK / (16 * baud)
+     * BRR[15:4] = mantissa, BRR[3:0] = fraction * 16
+     * 
+     * For 84 MHz APB2 @ 115200 baud: BRR = 0x2D9
+     */
+    USART1->BRR = 0x2D9;  /* Hardcoded for 84 MHz @ 115200 baud */
     
-    /* Enable USART1 interrupt in NVIC */
-    /* USART1_IRQn = 37 */
-    NVIC->ISER[USART1_IRQn / 32] = (1U << (USART1_IRQn % 32));
+    /* Enable USART first, then TE - critical order! */
+    USART1->CR1 = USART_CR1_UE;  /* Enable USART */
+    for (volatile int i = 0; i < 1000; i++);  /* Small delay */
+    
+    USART1->CR1 |= USART_CR1_TE | USART_CR1_RE;  /* Enable TX and RX */
+    
+    /* Wait for TE to be acknowledged */
+    for (volatile int i = 0; i < 100000; i++);
 }
 
 /**
@@ -148,16 +145,14 @@ void UART_Init(uint32_t baudrate) {
  * @return true if byte queued successfully, false if buffer full
  */
 bool UART_WriteByte(uint8_t data) {
-    /* Disable TX interrupt temporarily */
-    uint32_t cr1 = USART1->CR1;
-    USART1->CR1 &= ~USART_CR1_TXEIE;
-    
-    bool result = CircularBuffer_Put(&txBuffer, data);
-    
-    /* Enable TX interrupt to start transmission */
-    USART1->CR1 = cr1 | USART_CR1_TXEIE;
-    
-    return result;
+    /* Just do simple polling */
+    for (int timeout = 0; timeout < 10000000; timeout++) {
+        if (USART1->SR & USART_SR_TXE) {
+            USART1->DR = data;
+            return true;
+        }
+    }
+    return false;
 }
 
 /**

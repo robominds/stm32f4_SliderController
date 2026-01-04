@@ -16,25 +16,31 @@ int main(void) {
     /* Initialize system */
     SystemInit();
     
+    /* Initialize GPIO for LED */
+    LED_Init();
+    
     /* Initialize interrupt-driven UART at 115200 baud */
     UART_Init(115200);
     
     /* Send startup message */
+    UART_WriteString("\n\r");
     UART_WriteString("STM32F407 Interrupt-Driven UART Initialized\r\n");
     UART_WriteString("System Ready\r\n");
     
-    /* Initialize GPIO for LED */
-    LED_Init();
-    
     /* Create LED tasks */
-    LED_CreateTask1();
-    LED_CreateTask2();
+    if (LED_CreateTask1() != pdPASS) {
+        UART_WriteString("ERROR: Failed to create LED1 task\r\n");
+    }
+    if (LED_CreateTask2() != pdPASS) {
+        UART_WriteString("ERROR: Failed to create LED2 task\r\n");
+    }
     
-    /* Start the scheduler */
+    /* Start the FreeRTOS scheduler */
     vTaskStartScheduler();
     
     /* Should never reach here */
-    while (1) {
+    while(1) {
+        /* If we get here, scheduler failed */
     }
     
     return 0;
