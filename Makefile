@@ -38,7 +38,8 @@ src/main.cpp \
 src/led.cpp \
 src/pwm_driver.cpp \
 src/quadrature_decoder.cpp \
-src/uart_driver.cpp
+src/uart_driver.cpp \
+src/motor_controller.cpp
 
 # ASM sources
 ASM_SOURCES =  \
