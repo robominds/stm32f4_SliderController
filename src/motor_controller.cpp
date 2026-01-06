@@ -3,9 +3,12 @@
  * @brief   Motor controller wrapper for PWM output + quadrature encoder feedback.
  */
 
+#include <stdio.h>
 #include "motor_controller.h"
 #include "FreeRTOS.h" // IWYU pragma: keep - Must include FreeRTOS.h before task.h
 #include "task.h"
+#include "uart_driver.h"
+
 
 MotorController::MotorController() = default;
 
@@ -131,7 +134,9 @@ void MotorController::PositionTaskThunk(void *param) {
 }
 
 void MotorController::positionTaskLoop() {
+    static uint32_t cnt=0;
     const TickType_t delay_ticks = pdMS_TO_TICKS(sample_time_ms_);
+    char msg_buf[64];
 
     for (;;) {
         int32_t position = getPositionCounts();
@@ -146,7 +151,11 @@ void MotorController::positionTaskLoop() {
             duty = max_duty_percent_;
         }
 
-        setDuty(duty);
+        //setDuty(duty);
+        setDuty(50.0f);
+        snprintf(msg_buf,60,"Position: %ld %d\r\n", getPositionCounts(),cnt++);
+        UART_WriteString(msg_buf);
+        UART_FlushTx();
 
         vTaskDelay(delay_ticks);
     }

@@ -6,6 +6,7 @@
 
 
 #include <stdint.h>
+#include "pwm_driver.h"
 #include "stm32f407xx.h"
 #include "timer_common.h"
 #include "system_stm32f4xx.h"
@@ -14,8 +15,10 @@
 #include "led.h"
 #include "uart_driver.h"
 #include "motor_controller.h"
+#include "pwm_driver.h"
 
 static MotorController g_motor_controller;
+static PWM_Handle g_pwm{};
 
 static const PWM_Config kMotorPwmCfg = {
     TIM3_BASE,   /* timer_base */
@@ -49,6 +52,7 @@ int main(void) {
     UART_WriteString("\n\r");
     UART_WriteString("STM32F407 Interrupt-Driven UART Initialized\r\n");
     UART_WriteString("System Ready\r\n");
+    UART_FlushTx();
     
     /* Create LED tasks */
     if (LED_CreateTask1() != pdPASS) {
@@ -58,13 +62,49 @@ int main(void) {
         UART_WriteString("ERROR: Failed to create LED2 task\r\n");
     }
 
-    /* Initialize motor controller and start a simple position-hold task */
-    if (!g_motor_controller.init(kMotorPwmCfg, kMotorEncoderCfg)) {
-        UART_WriteString("ERROR: Motor controller init failed\r\n");
-    } else if (!g_motor_controller.startPositionControlTask(0.02f, 10U, 0, 75.0f)) {
-        UART_WriteString("ERROR: Motor position task start failed\r\n");
+    
+    MotorController mc = MotorController();
+    bool mc_ok = mc.init(kMotorPwmCfg, kMotorEncoderCfg);
+    if (!mc_ok) {
+        UART_WriteString("ERROR: MotorController init failed\r\n");
+        UART_FlushTx();
+    } else {
+        UART_WriteString("MotorController init ok\r\n");
+        UART_FlushTx();
+    }
+
+    mc.setDuty(50.0f);
+    mc.startPositionControlTask(.1, 10, 1000);
+
+    if(0) {    
+    /* For now, just test PWM standalone at 50% duty (skip motor controller/encoder). */
+    bool pwm_ok = PWM_Init(&g_pwm, &kMotorPwmCfg);
+    if (!pwm_ok) {
+        UART_WriteString("ERROR: PWM init failed\r\n");
+        UART_FlushTx();
+    } else {
+        UART_WriteString("PWM init ok\r\n");
+        UART_FlushTx();
+
+        UART_WriteString("About to set duty (float + int diag)\r\n");
+        UART_FlushTx();
+        PWM_SetDuty(&g_pwm, 50.0f);
+        UART_WriteString("Duty set via PWM_SetDuty\r\n");
+        UART_FlushTx();
+
+        UART_WriteString("About to enable PWM\r\n");
+        UART_FlushTx();
+        PWM_Enable(&g_pwm);
+        UART_WriteString("PWM enabled\r\n");
+        UART_FlushTx();
     }
     
+    g_motor_controller.setDuty(50.0);
+    }
+
+    UART_WriteString("xpost\r\n");
+    UART_FlushTx();
+
     /* Start the FreeRTOS scheduler */
     vTaskStartScheduler();
     
