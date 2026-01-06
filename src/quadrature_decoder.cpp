@@ -16,10 +16,14 @@
 /* Timer Capture/Compare Mode Register 1 (CCMR1) bits */
 #define TIM_CCMR1_CC1S_TI1  (1U << 0)   /* CC1 channel is input, IC1 mapped on TI1 */
 #define TIM_CCMR1_CC2S_TI2  (1U << 8)   /* CC2 channel is input, IC2 mapped on TI2 */
+#define TIM_CCMR1_IC1F_8    (3U << 4)   /* Input capture 1 filter: fSAMPLING=fDTS, N=8 */
+#define TIM_CCMR1_IC2F_8    (3U << 12)  /* Input capture 2 filter: fSAMPLING=fDTS, N=8 */
 
 /* Timer Capture/Compare Enable Register (CCER) bits */
 #define TIM_CCER_CC1E       (1U << 0)   /* Capture/Compare 1 output enable */
 #define TIM_CCER_CC2E       (1U << 4)   /* Capture/Compare 2 output enable */
+#define TIM_CCER_CC1P       (1U << 1)   /* Capture/Compare 1 output polarity */
+#define TIM_CCER_CC2P       (1U << 5)   /* Capture/Compare 2 output polarity */
 
 /**
  * @brief Enable timer clock based on timer base address
@@ -116,8 +120,15 @@ bool QuadEncoder_Init(QuadEncoder_Handle *handle, const QuadEncoder_Config *conf
     /* Set auto-reload value to maximum (16-bit) */
     TIM_ARR(config->timer_base) = 0xFFFF;
     
-    /* Configure inputs */
-    /* CC1 channel is input, IC1 mapped on TI1 */
+    /* Configure inputs with filtering to reduce noise */
+    /* CC1 channel is input, IC1 mapped on TI1 with filter */
+    /* CC2 channel is input, IC2 mapped on TI2 with filter */
+    /* ICxF = 0011b: fSAMPLING=fDTS, N=8 (good balance of filtering and response) */
+    TIM_CCMR1(config->timer_base) = TIM_CCMR1_CC1S_TI1 | TIM_CCMR1_CC2S_TI2 | 
+                                     TIM_CCMR1_IC1F_8 | TIM_CCMR1_IC2F_8;
+    
+    /* Enable capture/compare channels with non-inverted polarity */
+    /* CC1P=0 and CC2P=0 for non-inverted (rising edge)d on TI1 */
     /* CC2 channel is input, IC2 mapped on TI2 */
     TIM_CCMR1(config->timer_base) = TIM_CCMR1_CC1S_TI1 | TIM_CCMR1_CC2S_TI2;
     
