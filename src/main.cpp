@@ -62,10 +62,8 @@ int main(void) {
         UART_WriteString("ERROR: Failed to create LED2 task\r\n");
     }
 
-    
-    MotorController mc = MotorController();
-    bool mc_ok = mc.init(kMotorPwmCfg, kMotorEncoderCfg);
-    if (!mc_ok) {
+    g_motor_controller = MotorController();
+    if (!g_motor_controller.init(kMotorPwmCfg, kMotorEncoderCfg)) {
         UART_WriteString("ERROR: MotorController init failed\r\n");
         UART_FlushTx();
     } else {
@@ -73,10 +71,8 @@ int main(void) {
         UART_FlushTx();
     }
 
-    mc.setDuty(50.0f);
-    mc.startPositionControlTask(.1, 10, 1000);
+    g_motor_controller.startPositionControlTask(.1, 10, 1000);
 
-    if(0) {    
     /* For now, just test PWM standalone at 50% duty (skip motor controller/encoder). */
     bool pwm_ok = PWM_Init(&g_pwm, &kMotorPwmCfg);
     if (!pwm_ok) {
@@ -100,10 +96,6 @@ int main(void) {
     }
     
     g_motor_controller.setDuty(50.0);
-    }
-
-    UART_WriteString("xpost\r\n");
-    UART_FlushTx();
 
     /* Start the FreeRTOS scheduler */
     vTaskStartScheduler();
