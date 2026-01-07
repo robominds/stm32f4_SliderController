@@ -11,7 +11,7 @@
 extern "C" {
 #endif
 
-#include "FreeRTOS.h"
+#include "FreeRTOS.h" // IWYU pragma: keep - Must include FreeRTOS.h before task.h
 #include "task.h"
 
 /**

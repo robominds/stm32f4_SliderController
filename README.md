@@ -1,6 +1,6 @@
 # STM32F407VET6 Slider Controller with FreeRTOS
 
-A bare metal C++ project for the STM32F407VET6 Black Board featuring FreeRTOS task scheduling, LED control, PWM output, and quadrature encoder decoding.
+A bare metal C++ project for the STM32F407VET6 Black Board featuring FreeRTOS task scheduling, LED control, PWM output, quadrature encoder decoding, and a simple motor position controller task.
 
 ## Hardware Requirements
 
@@ -47,10 +47,12 @@ For detailed FreeRTOS configuration and usage information, see [docs/FREERTOS.md
 ├── FreeRTOS/                     # FreeRTOS kernel (not in repo - clone separately)
 ├── docs/
 │   ├── FREERTOS.md              # FreeRTOS integration documentation
-│   └── QUADRATURE_DECODER.md    # Quadrature encoder documentation
+│   ├── QUADRATURE_DECODER.md    # Quadrature encoder documentation
+│   └── MOTOR_CONTROLLER.md      # PWM + encoder wrapper with position task
 ├── inc/
 │   ├── FreeRTOSConfig.h         # FreeRTOS configuration
 │   ├── led.h                     # LED control header
+│   ├── motor_controller.h       # Motor controller (PWM + encoder + task)
 │   ├── pwm_driver.h             # PWM driver header
 │   ├── quadrature_decoder.h     # Encoder decoder header
 │   ├── stm32f407xx.h            # Device header file
@@ -59,6 +61,7 @@ For detailed FreeRTOS configuration and usage information, see [docs/FREERTOS.md
 ├── src/
 │   ├── main.cpp                  # Main application with FreeRTOS tasks
 │   ├── led.cpp                   # LED control implementation
+│   ├── motor_controller.cpp     # Motor controller implementation
 │   ├── pwm_driver.cpp           # PWM driver implementation
 │   ├── quadrature_decoder.cpp   # Encoder decoder implementation
 │   ├── system_stm32f4xx.c       # System initialization
@@ -113,6 +116,7 @@ The program uses FreeRTOS for task scheduling with the following features:
 3. **LED Control**: Implements LED blinking using FreeRTOS task delays
 4. **PWM Generation**: Provides PWM output for motor control or other applications
 5. **Quadrature Decoder**: Reads position and direction from rotary encoders
+6. **Motor Position Task**: Optional FreeRTOS task that holds a target position using a proportional loop over PWM and encoder feedback
 
 For detailed information about each component, see the documentation files in the `docs/` directory.
 
@@ -158,6 +162,7 @@ To modify LED behavior, PWM settings, or encoder configuration, see the respecti
 - LED control: [src/led.cpp](src/led.cpp) and [inc/led.h](inc/led.h)
 - PWM driver: [src/pwm_driver.cpp](src/pwm_driver.cpp) and [inc/pwm_driver.h](inc/pwm_driver.h)
 - Quadrature decoder: [src/quadrature_decoder.cpp](src/quadrature_decoder.cpp) and [inc/quadrature_decoder.h](inc/quadrature_decoder.h)
+- Motor controller + position task: [src/motor_controller.cpp](src/motor_controller.cpp), [inc/motor_controller.h](inc/motor_controller.h), and [docs/MOTOR_CONTROLLER.md](docs/MOTOR_CONTROLLER.md)
 - FreeRTOS configuration: [inc/FreeRTOSConfig.h](inc/FreeRTOSConfig.h)
 
 ## License
