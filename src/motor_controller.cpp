@@ -9,8 +9,11 @@
 
 MotorController::MotorController() = default;
 
-bool MotorController::init(const PWM_Config &pwm_cfg, const QuadEncoder_Config &enc_cfg) {
-    if (!PWM_Init(&pwm_, &pwm_cfg)) {
+bool MotorController::init(const PWM_Config pwm_cfg[], const QuadEncoder_Config &enc_cfg) {
+    if (!PWM_Init(&pwm_[0], &pwm_cfg[0])) {
+        return false;
+    }
+    if (!PWM_Init(&pwm_[1], &pwm_cfg[1])) {
         return false;
     }
     if (!QuadEncoder_Init(&encoder_, &enc_cfg)) {
@@ -22,22 +25,24 @@ bool MotorController::init(const PWM_Config &pwm_cfg, const QuadEncoder_Config &
 
 void MotorController::enable() {
     if (!initialized_) return;
-    PWM_Enable(&pwm_);
+    PWM_Enable(&pwm_[0]);
+    PWM_Enable(&pwm_[1]);
 }
 
 void MotorController::disable() {
     if (!initialized_) return;
-    PWM_Disable(&pwm_);
+    PWM_Disable(&pwm_[0]);
+    PWM_Disable(&pwm_[1]);
 }
 
-void MotorController::setDuty(float duty_percent) {
+void MotorController::setDuty(uint32_t chan, float duty_percent) {
     if (!initialized_) return;
-    PWM_SetDuty(&pwm_, duty_percent);
+    PWM_SetDuty(&pwm_[chan], duty_percent);
 }
 
-float MotorController::getDuty() const {
+float MotorController::getDuty(uint32_t chan) const {
     if (!initialized_) return 0.0f;
-    return PWM_GetDuty(const_cast<PWM_Handle *>(&pwm_));
+    return PWM_GetDuty(const_cast<PWM_Handle *>(&pwm_[chan]));
 }
 
 int32_t MotorController::getPositionCounts() {
@@ -106,7 +111,9 @@ void MotorController::stopPositionControlTask() {
         vTaskDelete(position_task_);
         position_task_ = nullptr;
     }
-    setDuty(0.0f);
+    for(uint32_t chan = 0; chan < 2; ++chan) {
+        setDuty(chan, 0.0f);
+    }
     disable();
 }
 
@@ -139,15 +146,15 @@ void MotorController::positionTaskLoop() {
 
         /* Simple proportional control; assumes external hardware handles direction. */
         float duty = kp_ * static_cast<float>(error);
-        if (duty < 0.0f) {
-            duty = 0.0f;
-        }
-        if (duty > max_duty_percent_) {
-            duty = max_duty_percent_;
+        
+        if(duty < 0.0) {
+            setDuty(0,-duty);
+            setDuty(1,0.0); 
+        } else {
+            setDuty(0,0.0);
+            setDuty(1,duty);
         }
 
-        //setDuty(duty);
-        setDuty(getPositionCounts()/10.0 + 50.0f);
 
         vTaskDelay(delay_ticks);
     }

@@ -18,16 +18,25 @@
 #include "pwm_driver.h"
 
 static MotorController g_motor_controller;
-static PWM_Handle g_pwm{};
+//static PWM_Handle g_pwm[2]{};
 
-static const PWM_Config kMotorPwmCfg = {
+static const PWM_Config kMotorPwmCfg[2] = {
+    {
     TIM3_BASE,   /* timer_base */
     GPIOB_BASE,  /* gpio_base */
     0,           /* pin: PB0 -> TIM3_CH3 (AF2) */
     2,           /* af_number */
     PWM_CHANNEL_3,
     20000U       /* frequency_hz: 20 kHz */
-};
+    },
+    {
+    TIM3_BASE,   /* timer_base */
+    GPIOB_BASE,  /* gpio_base */
+    1,           /* pin: PB0 -> TIM3_CH3 (AF2) */
+    2,           /* af_number */
+    PWM_CHANNEL_4,
+    20000U       /* frequency_hz: 20 kHz */
+    }};
 
 static const QuadEncoder_Config kMotorEncoderCfg = {
     TIM4_BASE,   /* timer_base */
@@ -72,30 +81,6 @@ int main(void) {
     }
 
     g_motor_controller.startPositionControlTask(.1, 10, 1000);
-
-    /* For now, just test PWM standalone at 50% duty (skip motor controller/encoder). */
-    bool pwm_ok = PWM_Init(&g_pwm, &kMotorPwmCfg);
-    if (!pwm_ok) {
-        UART_WriteString("ERROR: PWM init failed\r\n");
-        UART_FlushTx();
-    } else {
-        UART_WriteString("PWM init ok\r\n");
-        UART_FlushTx();
-
-        UART_WriteString("About to set duty (float + int diag)\r\n");
-        UART_FlushTx();
-        PWM_SetDuty(&g_pwm, 50.0f);
-        UART_WriteString("Duty set via PWM_SetDuty\r\n");
-        UART_FlushTx();
-
-        UART_WriteString("About to enable PWM\r\n");
-        UART_FlushTx();
-        PWM_Enable(&g_pwm);
-        UART_WriteString("PWM enabled\r\n");
-        UART_FlushTx();
-    }
-    
-    g_motor_controller.setDuty(50.0);
 
     /* Start the FreeRTOS scheduler */
     vTaskStartScheduler();

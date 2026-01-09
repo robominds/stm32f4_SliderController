@@ -32,7 +32,7 @@ public:
      * @param enc_cfg Encoder configuration (timer/pins/counts-per-rev).
      * @return true on success.
      */
-    bool init(const PWM_Config &pwm_cfg, const QuadEncoder_Config &enc_cfg);
+    bool init(const PWM_Config pwm_cfg[], const QuadEncoder_Config &enc_cfg);
 
     /** Enable PWM output. */
     void enable();
@@ -41,10 +41,10 @@ public:
     void disable();
 
     /** Set duty cycle in percent [0,100]. */
-    void setDuty(float duty_percent);
+    void setDuty(uint32_t chan, float duty_percent);
 
     /** Get current duty cycle percent. */
-    float getDuty() const;
+    float getDuty(uint32_t chan) const;
 
     /** Get encoder position in counts. */
     int32_t getPositionCounts();
@@ -87,7 +87,7 @@ private:
     static void PositionTaskThunk(void *param);
     void positionTaskLoop();
 
-    PWM_Handle pwm_{};
+    PWM_Handle pwm_[2]{};
     QuadEncoder_Handle encoder_{};
     bool initialized_ {false};
     TaskHandle_t position_task_{nullptr};
