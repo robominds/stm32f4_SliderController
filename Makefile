@@ -36,6 +36,7 @@ syscalls.c
 # C++ sources
 CXX_SOURCES = \
 src/main.cpp \
+src/gpio.cpp \
 src/led.cpp \
 src/pwm_driver.cpp \
 src/quadrature_decoder.cpp \
