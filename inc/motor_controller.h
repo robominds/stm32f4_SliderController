@@ -67,6 +67,7 @@ public:
      * @return true if the task was created.
      */
     bool startPositionControlTask(float kp,
+                                  float kd,
                                   uint32_t sample_time_ms,
                                   int32_t target_counts,
                                   float max_duty_percent = 100.0f);
@@ -92,6 +93,7 @@ private:
     bool initialized_ {false};
     TaskHandle_t position_task_{nullptr};
     float kp_{0.05f};
+    float kd_{0.05f};
     uint32_t sample_time_ms_{10};
     int32_t target_counts_{0};
     float max_duty_percent_{100.0f};

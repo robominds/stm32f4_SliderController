@@ -5,6 +5,8 @@
   */
 
 
+#include <stdio.h>
+#include "uart_driver.h"
 #include <stdint.h>
 #include "pwm_driver.h"
 #include "stm32f407xx.h"
@@ -23,18 +25,18 @@ static MotorController g_motor_controller;
 static const PWM_Config kMotorPwmCfg[2] = {
     {
     TIM3_BASE,   /* timer_base */
-    GPIOB_BASE,  /* gpio_base */
-    0,           /* pin: PB0 -> TIM3_CH3 (AF2) */
+    GPIOC_BASE,  /* gpio_base */
+    9,           /* pin: PC9 -> TIM3_CH3 (AF2) */
     2,           /* af_number */
-    PWM_CHANNEL_3,
+    PWM_CHANNEL_4,
     20000U       /* frequency_hz: 20 kHz */
     },
     {
     TIM3_BASE,   /* timer_base */
-    GPIOB_BASE,  /* gpio_base */
-    1,           /* pin: PB0 -> TIM3_CH3 (AF2) */
+    GPIOC_BASE,  /* gpio_base */
+    8,           /* pin: PC8 -> TIM3_CH4 (AF2) */
     2,           /* af_number */
-    PWM_CHANNEL_4,
+    PWM_CHANNEL_3,
     20000U       /* frequency_hz: 20 kHz */
     }};
 
@@ -53,7 +55,7 @@ int main(void) {
     
     /* Initialize GPIO for LED */
     LED_Init();
-    
+
     /* Initialize interrupt-driven UART at 115200 baud */
     UART_Init(115200);
     
@@ -80,7 +82,7 @@ int main(void) {
         UART_FlushTx();
     }
 
-    g_motor_controller.startPositionControlTask(.1, 10, 1000);
+    g_motor_controller.startPositionControlTask(1.5, .01, 10,6400);
 
     /* Start the FreeRTOS scheduler */
     vTaskStartScheduler();

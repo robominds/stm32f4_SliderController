@@ -69,6 +69,7 @@ void MotorController::setPosition(int32_t counts) {
 }
 
 bool MotorController::startPositionControlTask(float kp,
+                                               float kd,
                                                uint32_t sample_time_ms,
                                                int32_t target_counts,
                                                float max_duty_percent) {
@@ -79,6 +80,7 @@ bool MotorController::startPositionControlTask(float kp,
     if (position_task_ != nullptr) {
         setTargetPositionCounts(target_counts);
         kp_ = kp;
+        kd_ = kd;
         sample_time_ms_ = sample_time_ms == 0 ? 1U : sample_time_ms;
         max_duty_percent_ = max_duty_percent < 0.0f ? 0.0f : (max_duty_percent > 100.0f ? 100.0f : max_duty_percent);
         return true;
@@ -138,15 +140,20 @@ void MotorController::PositionTaskThunk(void *param) {
 }
 
 void MotorController::positionTaskLoop() {
+    static int32_t prevPosition = getPositionCounts();
     const TickType_t delay_ticks = pdMS_TO_TICKS(sample_time_ms_);
 
     for (;;) {
         int32_t position = getPositionCounts();
         int32_t error = target_counts_ - position;
 
+        int32_t deltaPosition = position - prevPosition;
+        prevPosition = position;
+        float speed_cps = static_cast<float>(deltaPosition) * (1000.0f / static_cast<float>(sample_time_ms_));
+
         /* Simple proportional control; assumes external hardware handles direction. */
-        float duty = kp_ * static_cast<float>(error);
-        
+        float duty = kp_ * static_cast<float>(error) - (kd_ * speed_cps);  /* Simple velocity damping */ 
+
         if(duty < 0.0) {
             setDuty(0,-duty);
             setDuty(1,0.0); 
