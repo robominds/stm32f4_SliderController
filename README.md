@@ -7,6 +7,7 @@ A bare metal C++ project for the STM32F407VET6 Black Board featuring FreeRTOS ta
 - STM32F407VET6 Black Board (512KB Flash, 128KB RAM)
 - ST-Link V2 or compatible programmer/debugger
 - USB cable for power and programming
+- Board schematic: [STM32F407VET6 Black Board (STM32_F4VE V2.0) schematic](https://stm32-base.org/assets/pdf/boards/original-schematic-STM32F407VET6-STM32_F4VE_V2.0.pdf)
 
 ## Software Requirements
 
