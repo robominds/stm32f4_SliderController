@@ -22,6 +22,17 @@ extern "C" {
 
 #ifdef __cplusplus
 
+/**
+ * @brief Limit switch configuration
+ */
+typedef struct {
+    uint32_t gpio_base;     /* GPIO port base address */
+    uint8_t pin_min;        /* Pin number for minimum limit */
+    uint8_t pin_max;        /* Pin number for maximum limit */
+    bool active_low;        /* True if switches are active low (common) */
+    bool enable_pullup;     /* True to enable internal pull-up resistors */
+} LimitSwitch_Config;
+
 class MotorController {
 public:
     MotorController();
@@ -33,6 +44,15 @@ public:
      * @return true on success.
      */
     bool init(const PWM_Config pwm_cfg[], const QuadEncoder_Config &enc_cfg);
+
+    /**
+     * @brief Initialize motor controller with limit switches.
+     * @param pwm_cfg PWM configuration array.
+     * @param enc_cfg Encoder configuration.
+     * @param limit_cfg Limit switch configuration.
+     * @return true on success.
+     */
+    bool init(const PWM_Config pwm_cfg[], const QuadEncoder_Config &enc_cfg, const LimitSwitch_Config &limit_cfg);
 
     /** Enable PWM output. */
     void enable();
@@ -84,19 +104,45 @@ public:
     /** Check whether the position task is active. */
     bool positionTaskRunning() const;
 
+    /** Check if minimum limit switch is active. */
+    bool isMinLimitActive() const;
+
+    /** Check if maximum limit switch is active. */
+    bool isMaxLimitActive() const;
+
+    /** Check if any limit switch is active. */
+    bool isAnyLimitActive() const;
+
+    /** Enable or disable limit switch checking. */
+    void setLimitSwitchEnabled(bool enabled);
+
+    /** Perform homing sequence to find minimum limit. */
+    bool homeToMinLimit(float homing_duty = 20.0f, uint32_t timeout_ms = 30000);
+
 private:
     static void PositionTaskThunk(void *param);
     void positionTaskLoop();
 
+    bool readLimitSwitch(uint8_t pin) const;
+    void initLimitSwitchGPIO();
+    bool checkLimitSafety(float duty_chan0, float duty_chan1) const;
+
     PWM_Handle pwm_[2]{};
     QuadEncoder_Handle encoder_{};
     bool initialized_ {false};
+    bool limit_switches_enabled_{false};
+    LimitSwitch_Config limit_config_{};
     TaskHandle_t position_task_{nullptr};
     float kp_{0.05f};
     float kd_{0.05f};
     uint32_t sample_time_ms_{10};
     int32_t target_counts_{0};
     float max_duty_percent_{100.0f};
+    
+    // Debouncing state
+    mutable uint32_t min_limit_debounce_count_{0};
+    mutable uint32_t max_limit_debounce_count_{0};
+    static constexpr uint32_t DEBOUNCE_THRESHOLD = 3;
 };
 
 #endif /* __cplusplus */

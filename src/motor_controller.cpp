@@ -4,8 +4,11 @@
  */
 
 #include "motor_controller.h"
+#include "stm32f407xx.h"
+#include "uart_driver.h"
 #include "FreeRTOS.h" // IWYU pragma: keep - Must include FreeRTOS.h before task.h
 #include "task.h"
+#include <cstdio>
 
 MotorController::MotorController() = default;
 
@@ -20,6 +23,19 @@ bool MotorController::init(const PWM_Config pwm_cfg[], const QuadEncoder_Config 
         return false;
     }
     initialized_ = true;
+    limit_switches_enabled_ = false;
+    return true;
+}
+
+bool MotorController::init(const PWM_Config pwm_cfg[], const QuadEncoder_Config &enc_cfg, const LimitSwitch_Config &limit_cfg) {
+    if (!init(pwm_cfg, enc_cfg)) {
+        return false;
+    }
+    
+    limit_config_ = limit_cfg;
+    initLimitSwitchGPIO();
+    limit_switches_enabled_ = true;
+    
     return true;
 }
 
@@ -66,6 +82,169 @@ void MotorController::resetPosition() {
 void MotorController::setPosition(int32_t counts) {
     if (!initialized_) return;
     QuadEncoder_SetPosition(&encoder_, counts);
+}
+
+void MotorController::initLimitSwitchGPIO() {
+    /* Enable GPIO clock */
+    uint32_t gpio_offset = (limit_config_.gpio_base - GPIOA_BASE) / 0x400;
+    RCC->AHB1ENR |= (1U << gpio_offset);
+    
+    GPIO_TypeDef *gpio = reinterpret_cast<GPIO_TypeDef *>(static_cast<uintptr_t>(limit_config_.gpio_base));
+    
+    /* Configure pins as inputs */
+    gpio->MODER &= ~(0x3U << (limit_config_.pin_min * 2));
+    gpio->MODER &= ~(0x3U << (limit_config_.pin_max * 2));
+    
+    /* Configure pull-up/pull-down */
+    if (limit_config_.enable_pullup) {
+        /* Enable pull-up resistors */
+        gpio->PUPDR &= ~(0x3U << (limit_config_.pin_min * 2));
+        gpio->PUPDR |= (0x1U << (limit_config_.pin_min * 2));
+        
+        gpio->PUPDR &= ~(0x3U << (limit_config_.pin_max * 2));
+        gpio->PUPDR |= (0x1U << (limit_config_.pin_max * 2));
+    } else {
+        /* No pull-up/pull-down */
+        gpio->PUPDR &= ~(0x3U << (limit_config_.pin_min * 2));
+        gpio->PUPDR &= ~(0x3U << (limit_config_.pin_max * 2));
+    }
+}
+
+bool MotorController::readLimitSwitch(uint8_t pin) const {
+    if (!limit_switches_enabled_) {
+        return false;
+    }
+    
+    GPIO_TypeDef *gpio = reinterpret_cast<GPIO_TypeDef *>(static_cast<uintptr_t>(limit_config_.gpio_base));
+    bool pin_state = (gpio->IDR & (1U << pin)) != 0;
+    
+    /* If active_low, invert the reading */
+    if (limit_config_.active_low) {
+        pin_state = !pin_state;
+    }
+    
+    return pin_state;
+}
+
+bool MotorController::isMinLimitActive() const {
+    bool active = readLimitSwitch(limit_config_.pin_min);
+    
+    /* Simple debouncing */
+    if (active) {
+        min_limit_debounce_count_++;
+        if (min_limit_debounce_count_ >= DEBOUNCE_THRESHOLD) {
+            min_limit_debounce_count_ = DEBOUNCE_THRESHOLD;
+            return true;
+        }
+    } else {
+        min_limit_debounce_count_ = 0;
+    }
+    
+    return false;
+}
+
+bool MotorController::isMaxLimitActive() const {
+    bool active = readLimitSwitch(limit_config_.pin_max);
+    
+    /* Simple debouncing */
+    if (active) {
+        max_limit_debounce_count_++;
+        if (max_limit_debounce_count_ >= DEBOUNCE_THRESHOLD) {
+            max_limit_debounce_count_ = DEBOUNCE_THRESHOLD;
+            return true;
+        }
+    } else {
+        max_limit_debounce_count_ = 0;
+    }
+    
+    return false;
+}
+
+bool MotorController::isAnyLimitActive() const {
+    return isMinLimitActive() || isMaxLimitActive();
+}
+
+void MotorController::setLimitSwitchEnabled(bool enabled) {
+    limit_switches_enabled_ = enabled;
+}
+
+bool MotorController::checkLimitSafety(float duty_chan0, float duty_chan1) const {
+    if (!limit_switches_enabled_) {
+        return true;  /* No limits, allow motion */
+    }
+    
+    /* Check if motion would violate limits */
+    /* Assuming chan0 is reverse/negative direction, chan1 is forward/positive */
+    bool min_active = isMinLimitActive();
+    bool max_active = isMaxLimitActive();
+    
+    /* If at minimum limit, don't allow reverse motion (chan0) */
+    if (min_active && duty_chan0 > 0.1f) {
+        return false;
+    }
+    
+    /* If at maximum limit, don't allow forward motion (chan1) */
+    if (max_active && duty_chan1 > 0.1f) {
+        return false;
+    }
+    
+    return true;
+}
+
+bool MotorController::homeToMinLimit(float homing_duty, uint32_t timeout_ms) {
+    if (!initialized_ || !limit_switches_enabled_) {
+        return false;
+    }
+    
+    char msg[80];
+    snprintf(msg, sizeof(msg), "Homing to minimum limit at %.1f%% duty...\r\n", homing_duty);
+    UART_WriteString(msg);
+    
+    /* If already at limit, back off slightly */
+    if (isMinLimitActive()) {
+        UART_WriteString("Already at min limit, backing off...\r\n");
+        enable();
+        setDuty(1, 10.0f);  /* Move forward */
+        setDuty(0, 0.0f);
+        vTaskDelay(pdMS_TO_TICKS(500));
+        setDuty(1, 0.0f);
+        
+        /* Wait for limit to clear */
+        uint32_t wait_count = 0;
+        while (isMinLimitActive() && wait_count < 100) {
+            vTaskDelay(pdMS_TO_TICKS(10));
+            wait_count++;
+        }
+    }
+    
+    /* Move toward minimum limit */
+    enable();
+    setDuty(0, homing_duty);  /* Reverse direction */
+    setDuty(1, 0.0f);
+    
+    uint32_t start_time = xTaskGetTickCount();
+    uint32_t timeout_ticks = pdMS_TO_TICKS(timeout_ms);
+    
+    /* Wait until limit is hit or timeout */
+    while (!isMinLimitActive()) {
+        if ((xTaskGetTickCount() - start_time) > timeout_ticks) {
+            setDuty(0, 0.0f);
+            disable();
+            UART_WriteString("ERROR: Homing timeout\r\n");
+            return false;
+        }
+        vTaskDelay(pdMS_TO_TICKS(10));
+    }
+    
+    /* Stop motion */
+    setDuty(0, 0.0f);
+    disable();
+    
+    /* Reset encoder position to zero at limit */
+    resetPosition();
+    
+    UART_WriteString("Homing complete, position reset to zero\r\n");
+    return true;
 }
 
 bool MotorController::startPositionControlTask(float kp,
@@ -154,14 +333,24 @@ void MotorController::positionTaskLoop() {
         /* Simple proportional control; assumes external hardware handles direction. */
         float duty = kp_ * static_cast<float>(error) - (kd_ * speed_cps);  /* Simple velocity damping */ 
 
+        float duty_chan0 = 0.0f;
+        float duty_chan1 = 0.0f;
+        
         if(duty < 0.0) {
-            setDuty(0,-duty);
-            setDuty(1,0.0); 
+            duty_chan0 = -duty;
         } else {
-            setDuty(0,0.0);
-            setDuty(1,duty);
+            duty_chan1 = duty;
         }
-
+        
+        /* Check limit switch safety before applying duty */
+        if (checkLimitSafety(duty_chan0, duty_chan1)) {
+            setDuty(0, duty_chan0);
+            setDuty(1, duty_chan1);
+        } else {
+            /* Limit violated, stop motor */
+            setDuty(0, 0.0f);
+            setDuty(1, 0.0f);
+        }
 
         vTaskDelay(delay_ticks);
     }
