@@ -49,6 +49,14 @@ static const QuadEncoder_Config kMotorEncoderCfg = {
     2048         /* counts_per_rev: adjust to your encoder */
 };
 
+static const LimitSwitch_Config kLimitSwitchCfg = {
+    GPIOB_BASE,  /* gpio_base */
+    0,           /* pin_min: PB0 */
+    1,           /* pin_max: PB1 */
+    true,        /* active_low: switches pull to ground when active */
+    true         /* enable_pullup: use internal pull-up resistors */
+};
+
 int main(void) {
     /* Initialize system */
     SystemInit();
@@ -74,11 +82,11 @@ int main(void) {
     }
 
     g_motor_controller = MotorController();
-    if (!g_motor_controller.init(kMotorPwmCfg, kMotorEncoderCfg)) {
+    if (!g_motor_controller.init(kMotorPwmCfg, kMotorEncoderCfg, kLimitSwitchCfg)) {
         UART_WriteString("ERROR: MotorController init failed\r\n");
         UART_FlushTx();
     } else {
-        UART_WriteString("MotorController init ok\r\n");
+        UART_WriteString("MotorController init ok with limit switches\r\n");
         UART_FlushTx();
     }
 
