@@ -8,7 +8,7 @@
 #include "uart_driver.h"
 #include "FreeRTOS.h" // IWYU pragma: keep - Must include FreeRTOS.h before task.h
 #include "task.h"
-#include <cstdio>
+#include <stdio.h>
 
 MotorController::MotorController() = default;
 
@@ -197,6 +197,19 @@ bool MotorController::homeToMinLimit(float homing_duty, uint32_t timeout_ms) {
     }
     
     char msg[80];
+
+    if(isMinLimitActive()) {
+        UART_WriteString("Error Minimum limit switch not active at start of homing\r\n");
+        disable();
+        return false;
+    }   
+
+    if(isMaxLimitActive()) {
+        UART_WriteString("Error Maximum limit switch not active at start of homing\r\n");
+        disable();
+        return false;
+    }   
+
     snprintf(msg, sizeof(msg), "Homing to minimum limit at %.1f%% duty...\r\n", homing_duty);
     UART_WriteString(msg);
     
@@ -211,12 +224,24 @@ bool MotorController::homeToMinLimit(float homing_duty, uint32_t timeout_ms) {
         
         /* Wait for limit to clear */
         uint32_t wait_count = 0;
-        while (isMinLimitActive() && wait_count < 100) {
+        while ((isMinLimitActive() && !isMaxLimitActive()) && wait_count < 100) {
             vTaskDelay(pdMS_TO_TICKS(10));
             wait_count++;
         }
     }
     
+    if(isMinLimitActive()) {
+        UART_WriteString("Error Minimum limit switch not active at end of homing\r\n");
+        disable();
+        return false;
+    }   
+
+    if(isMaxLimitActive()) {
+        UART_WriteString("Error Maximum limit switch not active at end of homing\r\n");
+        disable();
+        return false;
+    }   
+
     /* Move toward minimum limit */
     enable();
     setDuty(0, homing_duty);  /* Reverse direction */
@@ -226,7 +251,7 @@ bool MotorController::homeToMinLimit(float homing_duty, uint32_t timeout_ms) {
     uint32_t timeout_ticks = pdMS_TO_TICKS(timeout_ms);
     
     /* Wait until limit is hit or timeout */
-    while (!isMinLimitActive()) {
+    while (!isMinLimitActive() && !isMaxLimitActive()) {
         if ((xTaskGetTickCount() - start_time) > timeout_ticks) {
             setDuty(0, 0.0f);
             disable();
@@ -238,12 +263,15 @@ bool MotorController::homeToMinLimit(float homing_duty, uint32_t timeout_ms) {
     
     /* Stop motion */
     setDuty(0, 0.0f);
-    disable();
     
-    /* Reset encoder position to zero at limit */
-    resetPosition();
-    
-    UART_WriteString("Homing complete, position reset to zero\r\n");
+    if(!isMinLimitActive() && isMaxLimitActive()) {
+        UART_WriteString("ERROR: Hit maximum limit during homing\r\n");
+        return false;
+    } else { 
+        /* Reset encoder position to zero at limit */
+        resetPosition();
+        UART_WriteString("Homing complete, position reset to zero\r\n");
+    }
     return true;
 }
 
@@ -321,6 +349,12 @@ void MotorController::PositionTaskThunk(void *param) {
 void MotorController::positionTaskLoop() {
     static int32_t prevPosition = getPositionCounts();
     const TickType_t delay_ticks = pdMS_TO_TICKS(sample_time_ms_);
+
+    if(!homeToMinLimit(20.0f, 15000)) {  /* Optional homing at start */
+        UART_WriteString("ERROR: Homing failed\r\n");
+        disable();
+        vTaskDelete(nullptr);
+    }
 
     for (;;) {
         int32_t position = getPositionCounts();

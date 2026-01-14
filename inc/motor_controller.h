@@ -142,7 +142,7 @@ private:
     // Debouncing state
     mutable uint32_t min_limit_debounce_count_{0};
     mutable uint32_t max_limit_debounce_count_{0};
-    static constexpr uint32_t DEBOUNCE_THRESHOLD = 3;
+    static constexpr uint32_t DEBOUNCE_THRESHOLD = 1;
 };
 
 #endif /* __cplusplus */

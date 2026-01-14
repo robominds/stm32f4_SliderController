@@ -51,8 +51,8 @@ static const QuadEncoder_Config kMotorEncoderCfg = {
 
 static const LimitSwitch_Config kLimitSwitchCfg = {
     GPIOB_BASE,  /* gpio_base */
-    0,           /* pin_min: PB0 */
-    1,           /* pin_max: PB1 */
+    8,           /* pin_min: PB8 */
+    9,           /* pin_max: PB9 */
     true,        /* active_low: switches pull to ground when active */
     true         /* enable_pullup: use internal pull-up resistors */
 };
@@ -90,7 +90,7 @@ int main(void) {
         UART_FlushTx();
     }
 
-    g_motor_controller.startPositionControlTask(1.5, .01, 10,6400);
+    g_motor_controller.startPositionControlTask(1.0, .4, 10,6400);
 
     /* Start the FreeRTOS scheduler */
     vTaskStartScheduler();
