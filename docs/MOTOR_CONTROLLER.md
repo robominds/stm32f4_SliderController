@@ -15,13 +15,23 @@ A lightweight C++ wrapper that ties PWM output and quadrature encoder feedback i
 
 static MotorController motor;
 
-static const PWM_Config kPwmCfg = {
+static const PWM_Config kMotorPwmCfg[2] = {
+    {
     TIM3_BASE,   // timer_base
-    GPIOB_BASE,  // gpio_base
-    0,           // pin (PB0 -> TIM3_CH3 AF2)
+    GPIOC_BASE,  // gpio_base
+    9,           // pin: PC9 -> TIM3_CH4 (AF2)
+    2,           // af_number
+    PWM_CHANNEL_4,
+    20000U       // frequency_hz: 20 kHz
+    },
+    {
+    TIM3_BASE,   // timer_base
+    GPIOC_BASE,  // gpio_base
+    8,           // pin: PC8 -> TIM3_CH3 (AF2)
     2,           // af_number
     PWM_CHANNEL_3,
-    20000U       // frequency_hz (20 kHz)
+    20000U       // frequency_hz: 20 kHz
+    }
 };
 
 static const QuadEncoder_Config kEncCfg = {
@@ -34,38 +44,44 @@ static const QuadEncoder_Config kEncCfg = {
 };
 
 void app_init() {
-    motor.init(kPwmCfg, kEncCfg);
+    motor.init(kMotorPwmCfg, kEncCfg);
 
-    // kp: duty% per count of error
+    // kp: proportional gain (duty% per count of error)
+    // kd: derivative gain (duty% per count/sec of velocity)
     // sample_time_ms: loop period
     // target_counts: desired encoder position (counts)
     // max_duty_percent: saturate command
-    motor.startPositionControlTask(0.02f, 10U, 0, 75.0f);
+    motor.startPositionControlTask(1.0f, 0.4f, 10U, 6400, 75.0f);
 }
 ```
 
 ## API Highlights
-- `bool init(const PWM_Config&, const QuadEncoder_Config&)`
+- `bool init(const PWM_Config[], const QuadEncoder_Config&)`
+- `bool init(const PWM_Config[], const QuadEncoder_Config&, const LimitSwitch_Config&)`
 - `void enable() / disable()`
-- `void setDuty(float duty_percent)` / `float getDuty() const`
+- `void setDuty(uint32_t chan, float duty_percent)` / `float getDuty(uint32_t chan) const`
 - `int32_t getPositionCounts()` / `float getPositionRevolutions()`
 - `void resetPosition()` / `void setPosition(int32_t counts)`
-- `bool startPositionControlTask(float kp, uint32_t sample_time_ms, int32_t target_counts, float max_duty_percent=100.0f)`
+- `bool startPositionControlTask(float kp, float kd, uint32_t sample_time_ms, int32_t target_counts, float max_duty_percent=100.0f)`
 - `void stopPositionControlTask()`
 - `void setTargetPositionCounts(int32_t target_counts)` / `int32_t getTargetPositionCounts() const`
 - `bool positionTaskRunning() const`
+- `bool isMinLimitActive() / isMaxLimitActive() / isAnyLimitActive() const`
+- `void setLimitSwitchEnabled(bool enabled)`
+- `bool homeToMinLimit(float homing_duty=20.0f, uint32_t timeout_ms=30000)`
 
 ## Control Loop Details
-- Controller: proportional only; command = `kp * error_counts`
+- Controller: proportional-derivative (PD); command = `kp * error_counts + kd * velocity`
 - Saturation: duty is clamped to `[0, max_duty_percent]`; negative commands are forced to 0 (single-direction output)
 - Timing: loop runs in a FreeRTOS task with period `sample_time_ms` (minimum enforced to 1 ms)
 - Task priority: `tskIDLE_PRIORITY + 2`; stack size: `configMINIMAL_STACK_SIZE + 128`
 
 ## Tuning Tips
-1. Start with small `kp` (e.g., 0.01–0.05) and moderate `max_duty_percent` to avoid overshoot.
+1. Start with small `kp` (e.g., 0.01–0.05), small `kd` (e.g., 0.1–0.5) and moderate `max_duty_percent` to avoid overshoot.
 2. Increase `kp` until the motor reaches target briskly without oscillation.
-3. If the system feels sluggish, shorten `sample_time_ms` (watch CPU usage) or raise `kp` slightly.
-4. Set `counts_per_rev` accurately in the encoder config so position and rev calculations are correct.
+3. Adjust `kd` to dampen oscillations and improve settling time.
+4. If the system feels sluggish, shorten `sample_time_ms` (watch CPU usage) or raise `kp` slightly.
+5. Set `counts_per_rev` accurately in the encoder config so position and rev calculations are correct.
 
 ## Notes
 - For bidirectional control, add a direction GPIO or H-bridge driver and extend the controller to handle signed duty.
