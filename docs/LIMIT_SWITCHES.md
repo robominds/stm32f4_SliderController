@@ -41,8 +41,7 @@ When switch is **pressed**: Pin reads LOW (active)
 For STM32F407VET6, any GPIO pins can be used. Suggested configurations:
 
 | Configuration | Min Limit | Max Limit | GPIO Port |
-|--------------|-----------|-----------|-----------|
-| Option 1 | PC0 | PC1 | GPIOC |
+|--------------|-----------|-----------|-----------|| **Current** | **PB8** | **PB9** | **GPIOB** || Option 1 | PC0 | PC1 | GPIOC |
 | Option 2 | PD0 | PD1 | GPIOD |
 | Option 3 | PE0 | PE1 | GPIOE |
 
@@ -165,11 +164,14 @@ if (homed) {
 - `timeout_ms`: Maximum time to find limit in milliseconds
 
 **Homing Behavior:**
-1. If already at min limit, backs off slightly
-2. Moves toward minimum limit at specified duty
-3. Stops when limit switch activates
-4. Resets encoder position to zero
-5. Returns `true` if successful, `false` on timeout
+1. Validates limit switches are not active at start (error if triggered)
+2. If already at min limit, backs off slightly
+3. Moves toward minimum limit at specified duty
+4. Stops when limit switch activates
+5. Resets encoder position to zero
+6. Returns `true` if successful, `false` on timeout or if max limit hit
+
+**Important:** The position control task (`startPositionControlTask`) automatically calls `homeToMinLimit()` at startup with 20% duty and 15 second timeout.
 
 ### Enable/Disable Limit Checking
 
@@ -203,9 +205,10 @@ if (motor.isMaxLimitActive() && duty_forward > 0) {
 ### Debouncing
 
 Built-in software debouncing filters switch bounce:
-- Requires 3 consecutive reads to confirm limit active
+- Requires 1 consecutive read to confirm limit active (configurable)
 - Prevents false triggers from electrical noise
-- Adjustable via `DEBOUNCE_THRESHOLD` constant
+- Adjustable via `DEBOUNCE_THRESHOLD` constant (currently set to 1 in header)
+- **Note:** Lower threshold = faster response but less noise immunity
 
 ### Direction Assumptions
 
@@ -224,19 +227,19 @@ Adjust motor wiring or swap channel assignments if your motor moves opposite dir
 #include "uart_driver.h"
 
 void setupMotorSystem() {
-    // Configure limit switches on PC0 (min) and PC1 (max)
+    // Configure limit switches on PB8 (min) and PB9 (max) - current project configuration
     const LimitSwitch_Config limit_cfg = {
-        GPIOC_BASE,     // Port C
-        0,              // PC0 for minimum limit
-        1,              // PC1 for maximum limit
+        GPIOB_BASE,     // Port B
+        8,              // PB8 for minimum limit
+        9,              // PB9 for maximum limit
         true,           // Active-low (switch grounds pin)
         true            // Enable internal pull-ups
     };
     
     // Configure PWM for H-bridge control
     const PWM_Config motor_pwm[2] = {
-        {TIM3_BASE, GPIOB_BASE, 0, 2, PWM_CHANNEL_3, 20000U},
-        {TIM3_BASE, GPIOB_BASE, 1, 2, PWM_CHANNEL_4, 20000U}
+        {TIM3_BASE, GPIOC_BASE, 9, 2, PWM_CHANNEL_4, 20000U},  // PC9
+        {TIM3_BASE, GPIOC_BASE, 8, 2, PWM_CHANNEL_3, 20000U}   // PC8
     };
     
     // Configure encoder
@@ -308,12 +311,13 @@ void monitorLimits(MotorController &motor) {
 **Causes:**
 - Wrong GPIO port/pin configured
 - Switch not making contact
-- Debounce threshold too high
+- Active-low setting incorrect
 
 **Solutions:**
-1. Verify pin numbers match physical connections
+1. Verify pin numbers match physical connections (current: PB8/PB9)
 2. Test switch continuity with multimeter
-3. Temporarily lower `DEBOUNCE_THRESHOLD` for testing
+3. Check `active_low` configuration matches physical wiring
+4. Current `DEBOUNCE_THRESHOLD` is 1, so debouncing is minimal
 
 ### Issue: Homing times out
 
@@ -351,9 +355,10 @@ Adds minimal overhead:
 
 ### Performance
 
-- Debouncing requires 3 consecutive reads (configurable)
+- Debouncing requires 1 consecutive read (configurable via `DEBOUNCE_THRESHOLD`)
 - Limit checks add ~5-10 CPU cycles per control loop
 - Negligible impact on control performance
+- **Note:** Position control task automatically performs homing on startup
 
 ### Thread Safety
 
